@@ -59,7 +59,7 @@ def generate_and_send():
 
         email_body = "\n".join(body_lines)
 
-        # 3️⃣ Prepare the email
+        # 3️⃣ Send the email
         msg = MIMEMultipart()
         msg["Subject"] = "Activation de Badge"
         msg["From"] = SENDER_EMAIL
@@ -78,4 +78,17 @@ def generate_and_send():
             msg.attach(part)
 
         # --- EMAIL SENDING (STARTTLS) ---
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server
+        context = ssl.create_default_context()
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls(context=context)
+            server.login(USERNAME, PASSWORD)
+            server.send_message(msg)
+
+        return jsonify({"ok": True, "sent": True, "pdfs": len(pdfs)})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
