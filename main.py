@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 # --- CONFIGURATION ---
 SMTP_SERVER = "mail.touatgaz.com"
-SMTP_PORT = 587  # SSL
+SMTP_PORT = 587  # STARTTLS
 USERNAME = "tgs.hse"
 PASSWORD = ".touat123"
 SENDER_EMAIL = "tgs.hse@touatgaz.com"
@@ -59,7 +59,7 @@ def generate_and_send():
 
         email_body = "\n".join(body_lines)
 
-        # 3️⃣ Send the email
+        # 3️⃣ Prepare the email
         msg = MIMEMultipart()
         msg["Subject"] = "Activation de Badge"
         msg["From"] = SENDER_EMAIL
@@ -77,16 +77,5 @@ def generate_and_send():
             part["Content-Disposition"] = f'attachment; filename="{pdf["pdfName"]}"'
             msg.attach(part)
 
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
-            server.login(USERNAME, PASSWORD)
-            server.send_message(msg)
-
-        return jsonify({"ok": True, "sent": True, "pdfs": len(pdfs)})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+        # --- EMAIL SENDING (STARTTLS) ---
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server
