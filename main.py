@@ -1,27 +1,23 @@
 from flask import Flask, request, jsonify
-import smtplib
-import ssl
 import requests
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import base64
+import os
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
-SMTP_SERVER = "mail.touatgaz.com"
-SMTP_PORT = 587  # STARTTLS
-USERNAME = "tgs.hse"
-PASSWORD = ".touat123"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")  # Read from Render env variables
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+
 SENDER_EMAIL = "tgs.hse@touatgaz.com"
-
-GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwxqgOGs-X7g6h2sxU2SmCUUyG4Cf4v0VZovUBm8lykfzmTFdbQ1qwKLbadn_VRgKljPA/exec"
-
 RECIPIENTS_TO = ["boucenna.othman@gmail.com"]
 RECIPIENTS_CC = [
     "akayno21@gmail.com",
     "akayno23@gmail.com"
 ]
+
+GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwxqgOGs-X7g6h2sxU2SmCUUyG4Cf4v0VZovUBm8lykfzmTFdbQ1qwKLbadn_VRgKljPA/exec"
 
 
 @app.route("/", methods=["GET"])
@@ -36,16 +32,18 @@ def generate_and_send():
         agents = data.get("agents", [])
         signature = data.get("signature", "")
 
-        # 1️⃣ Send data to Google App Script
+        if not agents:
+            return jsonify({"error": "No agents provided"}), 400
+
+        # 1️⃣ Get PDFs from Google App Script
         response = requests.post(GOOGLE_WEB_APP_URL, json={"agents": agents})
         result = response.json()
-
         if not result.get("ok"):
             return jsonify({"error": "Failed to generate PDFs", "details": result}), 500
 
         pdfs = result.get("results", [])
 
-        # 2️⃣ Create the email body
+        # 2️⃣ Build email body
         body_lines = [
             "Bonjour,",
             "",
@@ -56,35 +54,46 @@ def generate_and_send():
             line = f"{agent['nom'].upper()} {agent['prenom'].upper()} badge {agent['badge']}"
             body_lines.append(line)
         body_lines += ["", "Cordialement,", signature]
-
         email_body = "\n".join(body_lines)
 
-        # 3️⃣ Send the email
-        msg = MIMEMultipart()
-        msg["Subject"] = "Activation de Badge"
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = ", ".join(RECIPIENTS_TO)
-        msg["Cc"] = ", ".join(RECIPIENTS_CC)
-        msg.attach(MIMEText(email_body, "plain"))
-
-        # Attach PDFs
+        # 3️⃣ Prepare attachments (base64)
+        attachments = []
         for pdf in pdfs:
             pdf_url = pdf.get("pdfUrl")
-            if not pdf_url:
-                continue
-            file_data = requests.get(pdf_url).content
-            part = MIMEApplication(file_data, Name=pdf["pdfName"])
-            part["Content-Disposition"] = f'attachment; filename="{pdf["pdfName"]}"'
-            msg.attach(part)
+            pdf_name = pdf.get("pdfName")
+            if pdf_url and pdf_name:
+                file_data = requests.get(pdf_url).content
+                encoded = base64.b64encode(file_data).decode("utf-8")
+                attachments.append({
+                    "content": encoded,
+                    "name": pdf_name
+                })
 
-        # --- EMAIL SENDING (STARTTLS) ---
-        context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls(context=context)
-            server.login(USERNAME, PASSWORD)
-            server.send_message(msg)
+        # 4️⃣ Send email via Brevo API
+        payload = {
+            "sender": {"email": SENDER_EMAIL, "name": "TGS HSE"},
+            "to": [{"email": email} for email in RECIPIENTS_TO],
+            "cc": [{"email": email} for email in RECIPIENTS_CC],
+            "subject": "Activation de Badge",
+            "textContent": email_body,
+            "attachment": attachments
+        }
 
-        return jsonify({"ok": True, "sent": True, "pdfs": len(pdfs)})
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "api-key": BREVO_API_KEY
+        }
+
+        res = requests.post(BREVO_API_URL, json=payload, headers=headers)
+        res.raise_for_status()
+
+        return jsonify({
+            "ok": True,
+            "sent": True,
+            "pdfs": len(pdfs),
+            "brevo_status": res.status_code
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
