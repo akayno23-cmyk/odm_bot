@@ -20,7 +20,6 @@ GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwxqgOGs-X7g6h2sxU
 RECIPIENTS_TO = ["boucenna.othman@gmail.com"]
 RECIPIENTS_CC = [
     "akayno21@gmail.com"
-    
 ]
 
 
@@ -74,15 +73,25 @@ def generate_and_send():
                 continue
             file_data = requests.get(pdf_url).content
             part = MIMEApplication(file_data, Name=pdf["pdfName"])
-            part["Content-Disposition"] = f'attachment; filename="{pdf["pdfName"]}"'
+            part["Content-Disposition"] = f'attachment; filename=\"{pdf['pdfName']}\"'
             msg.attach(part)
 
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
-            server.login(USERNAME, PASSWORD)
-            server.send_message(msg)
+        # --- DEBUG LOGGING ---
+        print("Connecting to mail server...")
+        try:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context) as server:
+                print("Connected.")
+                print("Logging in...")
+                server.login(USERNAME, PASSWORD)
+                print("Login successful. Sending email...")
+                server.send_message(msg)
+                print("✅ Email sent successfully!")
+            return jsonify({"ok": True, "sent": True, "pdfs": len(pdfs)})
 
-        return jsonify({"ok": True, "sent": True, "pdfs": len(pdfs)})
+        except Exception as e:
+            print("❌ Email send failed:", str(e))
+            return jsonify({"error": f"Email send failed: {str(e)}"}), 500
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
