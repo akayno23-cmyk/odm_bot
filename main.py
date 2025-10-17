@@ -17,11 +17,10 @@ SENDER_EMAIL = "tgs.hse@touatgaz.com"
 
 GOOGLE_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwxqgOGs-X7g6h2sxU2SmCUUyG4Cf4v0VZovUBm8lykfzmTFdbQ1qwKLbadn_VRgKljPA/exec"
 
-RECIPIENTS_TO = ["DirGenerale.ChefdegroupeSIE@touatgaz.com"]
+RECIPIENTS_TO = ["boucenna.othman@gmail.com"]
 RECIPIENTS_CC = [
-    "Appro-Contr.Sup.Logistique@Touatgaz.com",
-    "Tgs.coordinator.log@tgs-company.com",
-    "TGS.Coordinateur@Touatgaz.com"
+    "akayno21@gmail.com"
+    
 ]
 
 
